@@ -595,20 +595,58 @@ function renderListView() {
 
   // Attach events
   el.querySelectorAll('.job-card').forEach(card => attachCardEvents(card));
+
+  // Go Now done buttons
+  el.querySelectorAll('.gonow-done-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      triggerDone(btn.dataset.id, false);
+    });
+  });
 }
 
 function jobCardHTML(job, isPriority) {
   const p = getPriority(job);
   const isLate = p === 1, isUpcoming = p === 2, isPayment = p === 5;
+  const isGoNow = job.status === 'Go Now';
   const timeObj = job.targetTime ? fmtTime(job.targetTime) : null;
+
+  // ── GO NOW: special compact layout ──
+  if (isGoNow) {
+    return `
+    <div class="card-wrapper" data-id="${job.id}">
+      <div class="job-card gonow-card" data-id="${job.id}" style="border:3px solid #eab308">
+        <div class="card-banner banner-gonow" style="font-size:1.1rem;padding:12px 20px">
+          🟡 GO NOW
+        </div>
+        <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px">
+          ${job.area
+            ? `<div style="font-size:2rem;font-weight:900;color:#1e293b;display:flex;align-items:center;gap:10px">
+                ${I.pin.replace('18','28').replace('18','28')} ${job.area}
+               </div>`
+            : `<div style="font-size:1.2rem;font-weight:700;color:#94a3b8">No area set</div>`
+          }
+          <a href="tel:${job.phone}" class="phone-link card-phone-link" data-phone="${job.phone}" style="margin:0">
+            <div class="phone-icon">${I.phone}</div>
+            <div>
+              ${job.name ? `<div style="font-size:1rem;font-weight:800;color:#64748b;margin-bottom:2px">${job.name}</div>` : ''}
+              <span class="phone-num">${job.phone}</span>
+            </div>
+          </a>
+          <button class="gonow-done-btn" data-id="${job.id}" style="width:100%;background:#22c55e;color:white;border:none;border-radius:18px;padding:16px;font-size:1.3rem;font-weight:900;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;box-shadow:0 4px 14px rgba(34,197,94,.4)">
+            ${I.check} Done
+          </button>
+        </div>
+      </div>
+    </div>`;
+  }
 
   // Banner
   let bannerClass, bannerText;
-  if (isLate)            { bannerClass = 'banner-late';    bannerText = timeObj?.text || '🔴 LATE'; }
-  else if (isPayment)    { bannerClass = 'banner-payment'; bannerText = '🔵 Payment Due'; }
-  else if (isUpcoming)   { bannerClass = 'banner-upcoming'; bannerText = '🟡 UPCOMING SOON'; }
-  else if (job.status === 'Go Now') { bannerClass = 'banner-gonow'; bannerText = '🟡 GO NOW'; }
-  else                   { bannerClass = 'banner-callback'; bannerText = '🔴 CALL BACK'; }
+  if (isLate)          { bannerClass = 'banner-late';     bannerText = timeObj?.text || '🔴 LATE'; }
+  else if (isPayment)  { bannerClass = 'banner-payment';  bannerText = '🔵 Payment Due'; }
+  else if (isUpcoming) { bannerClass = 'banner-upcoming'; bannerText = '🟡 UPCOMING SOON'; }
+  else                 { bannerClass = 'banner-callback'; bannerText = '🔴 CALL BACK'; }
 
   const amountBadge = (job.amount && isPayment)
     ? `<div class="banner-amount">৳${job.amount} Due</div>` : '';
@@ -640,8 +678,8 @@ function jobCardHTML(job, isPriority) {
   return `
   <div class="card-wrapper" data-id="${job.id}">
     <div class="swipe-bg">
-      <div class="swipe-done">${I.check.replace('28','28').replace('28','28')} DONE</div>
-      <div class="swipe-pay">PAYMENT ${I.bank.replace('28','28')}</div>
+      <div class="swipe-done">${I.check} DONE</div>
+      <div class="swipe-pay">PAYMENT ${I.bank}</div>
     </div>
     <div class="${cardClass}" data-id="${job.id}">
       <div class="card-banner ${bannerClass}">
@@ -946,32 +984,7 @@ function copyNumber(phone, labelEl, btnEl) {
 function showCallPrompt(job) {
   setView('list');
   renderListView();
-  overlayRoot.innerHTML = `
-  <div class="overlay" id="call-overlay">
-    <div class="call-box">
-      <div class="call-icon-bg">
-        <svg width="80" height="80" fill="none" stroke="#22c55e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="40" cy="40" r="37"/><path d="m25 40 10 10 20-20"/></svg>
-      </div>
-      <h2>Saved!</h2>
-      <p>Call now?</p>
-      <a href="tel:${job.phone}" class="btn-call" id="call-yes">
-        ${I.phone.replace('28','36').replace('28','36')} Yes, Call
-      </a>
-      <button id="call-copy" style="width:100%;background:#f1f5f9;border:2px solid #e2e8f0;border-radius:16px;padding:14px;margin-bottom:10px;cursor:pointer;font-weight:900;font-size:1.1rem;color:#475569;display:flex;align-items:center;justify-content:center;gap:10px;transition:background .15s">
-        <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-        <span id="call-copy-label">Copy Number</span>
-      </button>
-      <button class="btn-skip" id="call-skip">
-        ${I.x.replace('28','28')} Skip
-      </button>
-    </div>
-  </div>`;
-
-  qs('#call-yes').addEventListener('click', () => setTimeout(clearOverlay, 300));
-  qs('#call-copy').addEventListener('click', () => {
-    copyNumber(job.phone, qs('#call-copy-label'), qs('#call-copy'));
-  });
-  qs('#call-skip').addEventListener('click', clearOverlay);
+  showSnackbar('', '✅ Saved! Tap the number to call.');
 }
 
 /* ── Payment Sheet ── */
@@ -1098,6 +1111,7 @@ function showSnackbar(id, msg) {
   snackbarJob = id;
   const sb = qs('#snackbar');
   qs('#snackbar-msg').textContent = msg;
+  qs('#btn-undo').style.display = id ? '' : 'none';
   sb.classList.remove('hidden');
   if (snackbarTimer) clearTimeout(snackbarTimer);
   snackbarTimer = setTimeout(() => { sb.classList.add('hidden'); snackbarJob = null; }, 4000);
